@@ -121,9 +121,9 @@ class CSA(BaseModel):
         self.ex_mask = self.mask_global.expand(1, 3, self.mask_global.size(2), self.mask_global.size(3)) # 1*c*h*w
 
         self.inv_ex_mask = torch.add(torch.neg(self.ex_mask.float()), 1).byte()
-        self.input_A.narrow(1,0,1).masked_fill_(self.mask_global, 2*123.0/255.0 - 1.0)
-        self.input_A.narrow(1,1,1).masked_fill_(self.mask_global, 2*104.0/255.0 - 1.0)
-        self.input_A.narrow(1,2,1).masked_fill_(self.mask_global, 2*117.0/255.0 - 1.0)
+        self.input_A.narrow(1,0,1).masked_fill_(self.mask_global.bool(), 2*123.0/255.0 - 1.0)
+        self.input_A.narrow(1,1,1).masked_fill_(self.mask_global.bool(), 2*104.0/255.0 - 1.0)
+        self.input_A.narrow(1,2,1).masked_fill_(self.mask_global.bool(), 2*117.0/255.0 - 1.0)
 
         self.set_latent_mask(self.mask_global, 3, self.opt.threshold)
 
@@ -136,8 +136,8 @@ class CSA(BaseModel):
         self.real_A =self.input_A.to(self.device)
         self.fake_P= self.netP(self.real_A)
         self.un=self.fake_P.clone()
-        self.Unknowregion=self.un.data.masked_fill_(self.inv_ex_mask, 0)
-        self.knownregion=self.real_A.data.masked_fill_(self.ex_mask, 0)
+        self.Unknowregion=self.un.data.masked_fill_(self.inv_ex_mask.bool(), 0)
+        self.knownregion=self.real_A.data.masked_fill_(self.ex_mask.bool(), 0)
         self.Syn=self.Unknowregion+self.knownregion
         self.Middle=torch.cat((self.Syn,self.input_A),1)
         self.fake_B = self.netG(self.Middle)
@@ -153,8 +153,8 @@ class CSA(BaseModel):
         self.real_A = self.input_A.to(self.device)
         self.fake_P= self.netP(self.real_A)
         self.un=self.fake_P.clone()
-        self.Unknowregion=self.un.data.masked_fill_(self.inv_ex_mask, 0)
-        self.knownregion=self.real_A.data.masked_fill_(self.ex_mask, 0)
+        self.Unknowregion=self.un.data.masked_fill_(self.inv_ex_mask.bool(), 0)
+        self.knownregion=self.real_A.data.masked_fill_(self.ex_mask.bool(), 0)
         self.Syn=self.Unknowregion+self.knownregion
         self.Middle=torch.cat((self.Syn,self.input_A),1)
         self.fake_B = self.netG(self.Middle)
