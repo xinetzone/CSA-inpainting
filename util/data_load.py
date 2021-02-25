@@ -9,11 +9,8 @@ class Data_load(torch.utils.data.Dataset):
         super(Data_load, self).__init__()
         self.img_transform = img_transform
         self.mask_transform = mask_transform
-
-
         self.paths = glob('{:s}/*'.format(img_root),
                               recursive=True)
-
 
         self.mask_paths = glob('{:s}/*.png'.format(mask_root))
 
