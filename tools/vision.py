@@ -59,11 +59,11 @@ class VisionDataset(VisionLoader):
                 raise ValueError(
                     "Target type \"{}\" is not recognized.".format(t))
         with self.loader.Z.open(f'img_align_celeba/{self.filename[index]}') as im:
-            X = np.array(Image.open(im))
-
-        X = as_tensor(X)
-        if self.transform is not None:
-            X = self.transform(X)
+            X = Image.open(im)
+            if self.transform is not None:
+                X = self.transform(X)
+            else:
+                X = as_tensor(X)
 
         if target:
             target = tuple(target) if len(target) > 1 else target[0]

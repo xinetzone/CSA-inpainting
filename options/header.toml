@@ -1,0 +1,4 @@
+data_root = 'D:/kaggle/dataset/CelebA-copy'  # image dataroot
+mask_root = 'D:/kaggle/datasets/mask/testing_mask_dataset'  # mask dataroot
+fine_size = 256  # image size
+batch_size = 1   # Need to be set to 1
