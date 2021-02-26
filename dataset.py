@@ -27,7 +27,7 @@ class Split:
         return VisionDataset(self.loader, split_type, target_type, transform, target_transform)
 
     def train(self, target_type, target_transform=None):
-        return self._dataset('train', target_type, self.transform.train, target_transform)
+        return self._dataset('train', target_type, self.transforms.train, target_transform)
 
     def valid(self, target_type, target_transform=None):
         return self._dataset('valid', target_type, self.transforms.test, target_transform)

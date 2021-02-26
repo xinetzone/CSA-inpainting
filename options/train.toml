@@ -1,6 +1,6 @@
 model = 'csa_net'
 gpu_ids = [0, 1]
-epochs = 120
+epochs = 10
 batch_size = 1
 save_dir = '../outputs'
 checkpoints_dir = '../checkpoints'
