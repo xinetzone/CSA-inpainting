@@ -4,5 +4,5 @@ epochs = 10
 batch_size = 1
 save_dir = '../outputs'
 checkpoints_dir = '../checkpoints'
-display_freq = 500
-save_epoch_freq = 2
+display_freq = 1000
+save_epoch_freq = 1
