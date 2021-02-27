@@ -30,7 +30,7 @@
 
 * Windows or Linux
 * Python3
-* Pytorch 1.0
+* Pytorch > 1.0
 * NVIDIA GPU + CUDA CuDNN.
 * Jupyter Notebook
 
@@ -47,15 +47,7 @@ cd CSA-inpainting
 
 * 安装 [PyTorch 和依赖项](http://pytorch.org)
 
-* 或者，您可以克隆存储库并由conda运行
-
-```sh
-conda env create -f environment.yaml 
-conda activate csa-inpainting
-jupyter notebook
-```
-
-打开浏览器并输入 URL `http://localhost:8080` 以使用 Jupyter Notebook
+* 打开浏览器并输入 URL `http://localhost:8080` 以使用 Jupyter Notebook
 
 --------------
 
