@@ -1,0 +1,7 @@
+name = 'CSA_inpainting'
+checkpoints_dir = '../checkpoints_dir'
+gpu_ids = [0]
+which_model_netG = 'unet_csa'  # seconde stage network
+which_epoch = ''
+ngf = 64  # inner channel
+batch_size = 1
