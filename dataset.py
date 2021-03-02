@@ -20,17 +20,17 @@ class Split:
         self.loader = loader
         self.transforms = Transform(fine_size)
 
-    def _dataset(self, split_type, target_type, transform=None, target_transform=None, pil_transform=False):
+    def _dataset(self, split_type, target_type, transform=None, target_transform=None, pil_transform=False, alpha=1):
         '''
         target_type 是 ["attr", "identity", "bbox", "landmarks"] 的子集
         '''
-        return VisionDataset(self.loader, split_type, target_type, transform, target_transform, pil_transform)
+        return VisionDataset(self.loader, split_type, target_type, transform, target_transform, pil_transform, alpha)
 
-    def train(self, target_type, target_transform=None, pil_transform=False):
-        return self._dataset('train', target_type, self.transforms.train, target_transform, pil_transform)
+    def train(self, target_type, target_transform=None, pil_transform=False, alpha=1):
+        return self._dataset('train', target_type, self.transforms.train, target_transform, pil_transform, alpha)
 
-    def valid(self, target_type, target_transform=None, pil_transform=False):
-        return self._dataset('valid', target_type, self.transforms.test, target_transform, pil_transform)
+    def valid(self, target_type, target_transform=None, pil_transform=False, alpha=1):
+        return self._dataset('valid', target_type, self.transforms.test, target_transform, pil_transform, alpha)
 
-    def test(self, target_type, target_transform=None, pil_transform=False):
-        return self._dataset('test', target_type, self.transforms.test, target_transform, pil_transform)
+    def test(self, target_type, target_transform=None, pil_transform=False, alpha=1):
+        return self._dataset('test', target_type, self.transforms.test, target_transform, pil_transform, alpha)

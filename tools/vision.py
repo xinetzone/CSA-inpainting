@@ -12,10 +12,11 @@ class VisionDataset(VisionLoader):
                  target_type: Union[List[str], str] = "attr",
                  transform: Optional[Callable] = None,
                  target_transform: Optional[Callable] = None,
-                 pil_transform=False) -> None:
+                 pil_transform=False, alpha=1) -> None:
         super().__init__(loader, transform=transform,
                          target_transform=target_transform)
         self.pil_transform = pil_transform
+        self.alpha = alpha
         if isinstance(target_type, list):
             self.target_type = target_type
         else:
@@ -83,7 +84,9 @@ class VisionDataset(VisionLoader):
                     e = 255*(dx*uni_x + dy*uni_y + dz*uni_z)  # 光源归一化
                     e = e.clip(0, 255)
 
-                    X = Image.fromarray(e.astype('uint8'))  # 重构图像
+                    _X = (1-self.alpha) * e + self.alpha * np.array(X)
+                    X = Image.fromarray(_X.astype('uint8'))  # 重构图像
+                    
 
                 if self.transform is not None:
                     X = self.transform(X)
