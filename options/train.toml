@@ -8,7 +8,7 @@ which_model_netG = 'unet_csa'  # seconde stage network
 which_model_netP = 'unet_256'  # first stage network
 which_epoch = ''
 batch_size = 1
-lambda_A = 100
+lambda_A = 100 # λ1=1
 
 is_train = true
 gan_type = 'lsgan'
