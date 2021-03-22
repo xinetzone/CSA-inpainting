@@ -1,12 +1,8 @@
 import torch.nn as nn
 import torch
-from torch.nn import functional as F
 
 from util import util
 from .CSAFunction import CSAFunction
-
-
-
 
 
 class CSA_model(nn.Module):
@@ -43,8 +39,9 @@ class CSA_model(nn.Module):
                 self.flag), 'flag must have been figured out and has to be a tensor!'
         else:
             latter = input.narrow(0, 0, 1).data
+
             self.flag, self.nonmask_point_idx, self.flatten_offsets, self.mask_point_idx = util.cal_mask_given_mask_thred(latter.squeeze(), self.mask, self.shift_sz,
-                                                                                                                   self.stride, self.mask_thred)
+                                                                                                                          self.stride, self.mask_thred)
             self.cal_fixed_flag = False
 
         if not (torch.is_tensor(self.sp_x) or torch.is_tensor(self.sp_y)):
