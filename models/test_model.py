@@ -1,3 +1,4 @@
+from torch import ByteTensor
 from torch.autograd import Variable
 from collections import OrderedDict
 import util.util as util
@@ -6,20 +7,25 @@ from . import networks
 
 
 class TestModel(BaseModel):
-    def name(self):
-        return 'TestModel'
+    def __init__(self, name, checkpoints_dir, gpu_ids, which_model_netG, which_epoch, ngf, batch_size,
+                 fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type):
+        '''
+        kw = (fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type)
+        '''
+        super().__init__(name, False, checkpoints_dir, gpu_ids)
+        self._initialize(which_model_netG, which_epoch, ngf, batch_size,
+                         fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type)
 
-    def initialize(self, opt):
-        assert(not opt.isTrain)
-        BaseModel.initialize(self, opt)
-        self.input_A = self.Tensor(opt.batchSize, opt.input_nc, opt.fineSize, opt.fineSize)
+    def _initialize(self, which_model_netG, which_epoch, ngf, batch_size,
+                   fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type):
+        # batchsize should be 1 for mask_global
+        self.mask_global = ByteTensor(1, 1, fine_size, fine_size)
+        self.input_A = self.Tensor(batch_size, input_nc,
+                                   fine_size, fine_size)
+        self.netG = networks.define_G(input_nc_g, output_nc, ngf,
+                                      which_model_netG, self.mask_global,
+                                      norm, use_dropout, init_type, self.gpu_ids, init_gain)
 
-        self.netG = networks.define_G(opt.input_nc, opt.output_nc,
-                                      opt.ngf, opt.which_model_netG, opt,
-                                      opt.norm, opt.use_dropout,
-                                      opt.init_type,
-                                      self.gpu_ids)
-        which_epoch = opt.which_epoch
         self.load_network(self.netG, 'G', which_epoch)
 
         print('---------- Networks initialized -------------')

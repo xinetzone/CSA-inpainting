@@ -1,16 +1,17 @@
-import torch
+from torch import nn
 import torchvision
 from torchvision import models
 from collections import namedtuple
 
-class Vgg16(torch.nn.Module):
+
+class Vgg16(nn.Module):
     def __init__(self, requires_grad=False):
-        super(Vgg16, self).__init__()
+        super().__init__()
         vgg_pretrained_features = models.vgg16(pretrained=True).features
-        self.slice1 = torch.nn.Sequential()
-        self.slice2 = torch.nn.Sequential()
-        self.slice3 = torch.nn.Sequential()
-        self.slice4 = torch.nn.Sequential()
+        self.slice1 = nn.Sequential()
+        self.slice2 = nn.Sequential()
+        self.slice3 = nn.Sequential()
+        self.slice4 = nn.Sequential()
         for x in range(5):
             self.slice1.add_module(str(x), vgg_pretrained_features[x])
         for x in range(5, 10):
@@ -32,6 +33,8 @@ class Vgg16(torch.nn.Module):
         h_relu3_3 = h
         h = self.slice4(h)
         h_relu4_3 = h
-        vgg_outputs = namedtuple("VggOutputs", ['relu1_2', 'relu2_2', 'relu3_3', 'relu4_3'])
+        vgg_outputs = namedtuple("VggOutputs",
+                                 ['relu1_2', 'relu2_2',
+                                  'relu3_3', 'relu4_3'])
         out = vgg_outputs(h_relu1_2, h_relu2_2, h_relu3_3, h_relu4_3)
         return out

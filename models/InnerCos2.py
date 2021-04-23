@@ -1,14 +1,13 @@
-import torch.nn as nn
-import torch
+from torch import nn, cuda, mul
 from torch.autograd import Variable
-import util.util as util
+from util import util
 
 
 class InnerCos2(nn.Module):
     def __init__(self, crit='MSE', strength=1, skip=0, infe=None):
-        super(InnerCos2, self).__init__()
+        super().__init__()
         self.crit = crit
-        self.criterion = torch.nn.MSELoss() if self.crit == 'MSE' else torch.nn.L1Loss()
+        self.criterion = nn.MSELoss() if self.crit == 'MSE' else nn.L1Loss()
 
         self.strength = strength
         self.inin = None
@@ -18,10 +17,10 @@ class InnerCos2(nn.Module):
         self.skip = skip
         self.infe = infe
 
-    def set_mask(self, mask_global, opt):
-        mask = util.cal_feat_mask(mask_global, 3, opt.threshold)
+    def set_mask(self, mask_global, threshold):
+        mask = util.cal_feat_mask(mask_global, 3, threshold)
         self.mask = mask.squeeze()
-        if torch.cuda.is_available:
+        if cuda.is_available:
             self.mask = self.mask.float().cuda()
         self.mask = Variable(self.mask, requires_grad=False)
 
@@ -36,7 +35,7 @@ class InnerCos2(nn.Module):
 
             self.former = in_data.narrow(1, 0, 512)
             self.bs, self.c, _, _ = self.former.size()
-            self.former_in_mask = torch.mul(self.former, self.mask)
+            self.former_in_mask = mul(self.former, self.mask)
             self.loss = self.criterion(
                 self.former_in_mask * self.strength, self.target)
             self.output = in_data
