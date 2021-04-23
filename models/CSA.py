@@ -26,15 +26,15 @@ class ReliefCNN(nn.Module):
 
 
 class CSA(BaseModel):
-    def __init__(self, name, is_train, checkpoints_dir, gpu_ids,
+    def __init__(self, beta, name, is_train, checkpoints_dir, gpu_ids,
                  lambda_A, gan_weight, cosis,
                  batch_size, mask_type, ngf, ndf,
                  which_model_netG, which_model_netP, which_model_netD, which_model_netF,
                  gan_type, continue_train, which_epoch, lr, beta1,
                  lr_policy, niter, niter_decay, lr_decay_iters, epoch_count, overlap,
-                 fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type, relief_beta = 0.8):
+                 fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type):
         super().__init__(name, is_train, checkpoints_dir, gpu_ids)
-        self.relief_beta = relief_beta # test 时，设置为 1
+        self.beta = beta # test 时，设置为 1
         self.lambda_A = lambda_A
         self.gan_weight = gan_weight
         self.cosis = cosis
@@ -168,7 +168,7 @@ class CSA(BaseModel):
     def forward(self):
         self.real_A = self.input_A.to(self.device)
         # 修改
-        self.fake_P = self.relief_beta*self.real_A + (1-self.relief_beta)*self.netR(self.real_A)
+        self.fake_P = self.beta*self.real_A + (1-self.beta)*self.netR(self.real_A)
         self.fake_P = self.netP(self.fake_P)
         self.un = self.fake_P.clone()
         self.Unknowregion = self.un.data.masked_fill_(
@@ -296,4 +296,5 @@ class CSA(BaseModel):
     def load(self, epoch):
         self.load_network(self.netG, 'G', epoch)
         self.load_network(self.netP, 'P', epoch)
-        self.load_network(self.netP, 'R', epoch)
+        if self.beta < 1:
+            self.load_network(self.netP, 'R', epoch)
