@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
-from torch.autograd import Variable
-import util.util as util
+
+from util import util
 from .CSAFunction import CSAFunction
 
 

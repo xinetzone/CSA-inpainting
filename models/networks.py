@@ -16,6 +16,7 @@ from .InnerCos2 import InnerCos2
 # Functions
 ###############################################################################
 
+
 def get_norm_layer(norm_type='instance'):
     if norm_type == 'batch':
         norm_layer = functools.partial(nn.BatchNorm2d, affine=True)
@@ -24,22 +25,27 @@ def get_norm_layer(norm_type='instance'):
     elif norm_type == 'none':
         norm_layer = None
     else:
-        raise NotImplementedError('normalization layer [%s] is not found' % norm_type)
+        raise NotImplementedError(
+            'normalization layer [%s] is not found' % norm_type)
     return norm_layer
 
 
 def get_scheduler(optimizer, opt):
     if opt.lr_policy == 'lambda':
         def lambda_rule(epoch):
-            lr_l = 1.0 - max(0, epoch + 1 + opt.epoch_count - opt.niter) / float(opt.niter_decay + 1)
+            lr_l = 1.0 - max(0, epoch + 1 + opt.epoch_count -
+                             opt.niter) / float(opt.niter_decay + 1)
             return lr_l
         scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
     elif opt.lr_policy == 'step':
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
+        scheduler = lr_scheduler.StepLR(
+            optimizer, step_size=opt.lr_decay_iters, gamma=0.1)
     elif opt.lr_policy == 'plateau':
-        scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
+        scheduler = lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.2, threshold=0.01, patience=5)
     elif opt.lr_policy == 'cosine':
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.niter, eta_min=0)
+        scheduler = lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=opt.niter, eta_min=0)
     else:
         return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
     return scheduler
@@ -58,7 +64,8 @@ def init_weights(net, init_type='normal', gain=0.02):
             elif init_type == 'orthogonal':
                 init.orthogonal(m.weight.data, gain=gain)
             else:
-                raise NotImplementedError('initialization method [%s] is not implemented' % init_type)
+                raise NotImplementedError(
+                    'initialization method [%s] is not implemented' % init_type)
             if hasattr(m, 'bias') and m.bias is not None:
                 init.constant_(m.bias.data, 0.0)
         elif classname.find('BatchNorm2d') != -1:
@@ -81,23 +88,20 @@ def define_G(input_nc, output_nc, ngf, which_model_netG, opt, mask_global, norm=
     netG = None
     norm_layer = get_norm_layer(norm_type=norm)
 
-
-
     cosis_list = []
     cosis_list2 = []
     csa_model = []
     if which_model_netG == 'unet_256':
-        netG = UnetGenerator(input_nc, output_nc, 8, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = UnetGenerator(input_nc, output_nc, 8, ngf,
+                             norm_layer=norm_layer, use_dropout=use_dropout)
     elif which_model_netG == 'unet_csa':
-        netG = UnetGeneratorCSA(input_nc, output_nc, 8, opt, mask_global, csa_model,cosis_list, cosis_list2,ngf, norm_layer=norm_layer, use_dropout=use_dropout)
+        netG = UnetGeneratorCSA(input_nc, output_nc, 8, opt, mask_global, csa_model,
+                                cosis_list, cosis_list2, ngf, norm_layer=norm_layer, use_dropout=use_dropout)
     else:
-        raise NotImplementedError('Generator model name [%s] is not recognized' % which_model_netG)
- 
-    
+        raise NotImplementedError(
+            'Generator model name [%s] is not recognized' % which_model_netG)
 
-
-
-    return init_net(netG, init_type, init_gain, gpu_ids),cosis_list ,cosis_list2,csa_model
+    return init_net(netG, init_type, init_gain, gpu_ids), cosis_list, cosis_list2, csa_model
 
 
 def define_D(input_nc, ndf, which_model_netD,
@@ -106,13 +110,14 @@ def define_D(input_nc, ndf, which_model_netD,
     norm_layer = get_norm_layer(norm_type=norm)
 
     if which_model_netD == 'basic':
-        netD = NLayerDiscriminator(input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
+        netD = NLayerDiscriminator(
+            input_nc, ndf, n_layers=3, norm_layer=norm_layer, use_sigmoid=use_sigmoid)
     elif which_model_netD == 'feature':
         netD = PFDiscriminator()
     else:
         raise NotImplementedError('Discriminator model name [%s] is not recognized' %
-              which_model_netD)
-    
+                                  which_model_netD)
+
     return init_net(netD, init_type, init_gain, gpu_ids)
 
 
@@ -147,7 +152,6 @@ class GANLoss(nn.Module):
         else:
             raise ValueError("GAN type [%s] not recognized." % gan_type)
 
-
     def get_target_tensor(self, input, target_is_real):
         target_tensor = None
         if target_is_real:
@@ -155,24 +159,25 @@ class GANLoss(nn.Module):
                             (self.real_label_var.numel() != input.numel()))
             if create_label:
                 real_tensor = self.Tensor(input.size()).fill_(self.real_label)
-                self.real_label_var = Variable(real_tensor, requires_grad=False)
+                self.real_label_var = Variable(
+                    real_tensor, requires_grad=False)
             target_tensor = self.real_label_var
         else:
             create_label = ((self.fake_label_var is None) or
                             (self.fake_label_var.numel() != input.numel()))
             if create_label:
                 fake_tensor = self.Tensor(input.size()).fill_(self.real_label)
-                self.fake_label_var = Variable(fake_tensor, requires_grad=False)
+                self.fake_label_var = Variable(
+                    fake_tensor, requires_grad=False)
             target_tensor = self.fake_label_var
         return target_tensor
 
-    def __call__(self, y_pred_fake,y_pred, target_is_real):
+    def __call__(self, y_pred_fake, y_pred, target_is_real):
         target_tensor = self.get_target_tensor(y_pred_fake, target_is_real)
         if(target_is_real):
             errD = (torch.mean((y_pred - torch.mean(y_pred_fake) - target_tensor) ** 2) + torch.mean(
                 (y_pred_fake - torch.mean(y_pred) + target_tensor) ** 2)) / 2
             return errD
-
 
         else:
             errG = (torch.mean((y_pred - torch.mean(y_pred_fake) + target_tensor) ** 2) + torch.mean(
@@ -180,22 +185,29 @@ class GANLoss(nn.Module):
             return errG
 
 
-
 class UnetGeneratorCSA(nn.Module):
-    def __init__(self, input_nc, output_nc,  num_downs, opt, mask_global, csa_model,cosis_list ,cosis_list2,ngf=64,
+    def __init__(self, input_nc, output_nc,  num_downs, opt, mask_global, csa_model, cosis_list, cosis_list2, ngf=64,
                  norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetGeneratorCSA, self).__init__()
 
         # construct unet structure
-        unet_block = UnetSkipConnectionBlock_3(ngf * 8, ngf * 8,  input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
+        unet_block = UnetSkipConnectionBlock_3(
+            ngf * 8, ngf * 8,  input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
 
-        for i in range(num_downs - 5):  # The innner layers number is 3 (sptial size:512*512), if unet_256.
-            unet_block = UnetSkipConnectionBlock_3(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
-        unet_block = UnetSkipConnectionBlock_3(ngf * 8, ngf * 8, input_nc=None,submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
-        unet_csa = CSA(ngf * 4, ngf * 8, opt, csa_model,cosis_list ,cosis_list2,mask_global, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock_3(ngf * 2, ngf * 4, input_nc=None,submodule=unet_csa, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock_3(ngf, ngf * 2,input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock_3(output_nc, ngf,input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)
+        # The innner layers number is 3 (sptial size:512*512), if unet_256.
+        for i in range(num_downs - 5):
+            unet_block = UnetSkipConnectionBlock_3(
+                ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+        unet_block = UnetSkipConnectionBlock_3(
+            ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+        unet_csa = CSA(ngf * 4, ngf * 8, opt, csa_model, cosis_list, cosis_list2,
+                       mask_global, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock_3(
+            ngf * 2, ngf * 4, input_nc=None, submodule=unet_csa, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock_3(
+            ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock_3(
+            output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)
 
         self.model = unet_block
 
@@ -204,7 +216,7 @@ class UnetGeneratorCSA(nn.Module):
 
 
 class UnetSkipConnectionBlock_3(nn.Module):
-    def __init__(self, outer_nc, inner_nc,input_nc,
+    def __init__(self, outer_nc, inner_nc, input_nc,
                  submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetSkipConnectionBlock_3, self).__init__()
         self.outermost = outermost
@@ -212,7 +224,7 @@ class UnetSkipConnectionBlock_3(nn.Module):
             input_nc = outer_nc
 
         downconv_3 = nn.Conv2d(input_nc, inner_nc, kernel_size=3,
-                             stride=1, padding=1)
+                               stride=1, padding=1)
         downrelu_3 = nn.LeakyReLU(0.2, True)
         downnorm_3 = norm_layer(inner_nc, affine=True)
         uprelu_3 = nn.ReLU(True)
@@ -230,8 +242,8 @@ class UnetSkipConnectionBlock_3(nn.Module):
         if outermost:
 
             upconv_3 = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=3, stride=1,
-                                        padding=1)
+                                          kernel_size=3, stride=1,
+                                          padding=1)
             down = [downconv_3]
             up = [uprelu, upconv_3]
             model = down + [submodule] + up
@@ -240,7 +252,8 @@ class UnetSkipConnectionBlock_3(nn.Module):
             upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
                                         kernel_size=4, stride=2,
                                         padding=1)
-            down = [downrelu, downconv]  # for the innermost, no submodule, and delete the bn
+            # for the innermost, no submodule, and delete the bn
+            down = [downrelu, downconv]
             up = [uprelu, upconv, upnorm]
             model = down + up
             # else, the normal
@@ -249,10 +262,11 @@ class UnetSkipConnectionBlock_3(nn.Module):
                                         kernel_size=4, stride=2,
                                         padding=1)
             upconv_3 = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=3, stride=1,
-                                        padding=1)
-            down = [downrelu, downconv, downnorm,downrelu_3,downconv_3,downnorm_3]
-            up = [uprelu_3,upconv_3,upnorm_3,uprelu, upconv, upnorm]
+                                          kernel_size=3, stride=1,
+                                          padding=1)
+            down = [downrelu, downconv, downnorm,
+                    downrelu_3, downconv_3, downnorm_3]
+            up = [uprelu_3, upconv_3, upnorm_3, uprelu, upconv, upnorm]
 
             if use_dropout:
                 model = down + [submodule] + up + [nn.Dropout(0.5)]
@@ -273,18 +287,17 @@ class UnetSkipConnectionBlock_3(nn.Module):
 
 
 class CSA(nn.Module):
-    def __init__(self, outer_nc, inner_nc, opt,csa_model,cosis_list, cosis_list2,mask_global, input_nc, \
+    def __init__(self, outer_nc, inner_nc, opt, csa_model, cosis_list, cosis_list2, mask_global, input_nc,
                  submodule=None,  outermost=False, innermost=False, norm_layer=nn.BatchNorm2d,
                  use_dropout=False):
         super(CSA, self).__init__()
         self.outermost = outermost
 
-
         if input_nc is None:
             input_nc = outer_nc
 
         downconv_3 = nn.Conv2d(input_nc, inner_nc, kernel_size=3,
-                             stride=1, padding=1)
+                               stride=1, padding=1)
         downrelu_3 = nn.LeakyReLU(0.2, True)
         downnorm_3 = norm_layer(inner_nc, affine=True)
         uprelu_3 = nn.ReLU(True)
@@ -297,25 +310,27 @@ class CSA(nn.Module):
         uprelu = nn.ReLU(True)
         upnorm = norm_layer(outer_nc, affine=True)
 
-        csa= CSA_model(opt.threshold, opt.fixed_mask, opt.shift_sz, opt.stride, opt.mask_thred, opt.triple_weight)
+        csa = CSA_model(opt.threshold, opt.fixed_mask, opt.shift_sz,
+                        opt.stride, opt.mask_thred, opt.triple_weight)
         csa.set_mask(mask_global, 3, opt.threshold)
         csa_model.append(csa)
         innerCos = InnerCos(strength=opt.strength, skip=opt.skip)
-        innerCos.set_mask(mask_global, opt)  # Here we need to set mask for innerCos layer too.
+        # Here we need to set mask for innerCos layer too.
+        innerCos.set_mask(mask_global, opt)
         cosis_list.append(innerCos)
 
         innerCos2 = InnerCos2(strength=opt.strength, skip=opt.skip)
-        innerCos2.set_mask(mask_global, opt)  # Here we need to set mask for innerCos layer too.
+        # Here we need to set mask for innerCos layer too.
+        innerCos2.set_mask(mask_global, opt)
         cosis_list2.append(innerCos2)
-
 
         # Different position only has differences in `upconv`
         # for the outermost, the special is `tanh`
         if outermost:
 
             upconv_3 = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=3, stride=1,
-                                        padding=1)
+                                          kernel_size=3, stride=1,
+                                          padding=1)
             down = [downconv_3]
             up = [uprelu, upconv_3]
             model = down + [submodule] + up
@@ -324,7 +339,8 @@ class CSA(nn.Module):
             upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
                                         kernel_size=4, stride=2,
                                         padding=1)
-            down = [downrelu, downconv]  # for the innermost, no submodule, and delete the bn
+            # for the innermost, no submodule, and delete the bn
+            down = [downrelu, downconv]
             up = [uprelu, upconv, upnorm]
             model = down + up
             # else, the normal
@@ -333,10 +349,12 @@ class CSA(nn.Module):
                                         kernel_size=4, stride=2,
                                         padding=1)
             upconv_3 = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=3, stride=1,
-                                        padding=1)
-            down = [downrelu, downconv, downnorm,downrelu_3,downconv_3,csa,innerCos,downnorm_3]
-            up = [innerCos2,uprelu_3,upconv_3,upnorm_3,uprelu, upconv, upnorm]
+                                          kernel_size=3, stride=1,
+                                          padding=1)
+            down = [downrelu, downconv, downnorm, downrelu_3,
+                    downconv_3, csa, innerCos, downnorm_3]
+            up = [innerCos2, uprelu_3, upconv_3,
+                  upnorm_3, uprelu, upconv, upnorm]
 
             if use_dropout:
                 model = down + [submodule] + up + [nn.Dropout(0.5)]
@@ -356,21 +374,26 @@ class CSA(nn.Module):
             return torch.cat([x_latter, x], 1)  # cat in the C channel
 
 
-
-
 class UnetGenerator(nn.Module):
     def __init__(self, input_nc, output_nc, num_downs, ngf=64,
                  norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetGenerator, self).__init__()
 
         # construct unet structure
-        unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
-        for i in range(num_downs - 5):  # The innner layers number is 3 (sptial size:512*512), if unet_256.
-            unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
-        unet_block = UnetSkipConnectionBlock(ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
-        unet_block = UnetSkipConnectionBlock(output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(
+            ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)
+        # The innner layers number is 3 (sptial size:512*512), if unet_256.
+        for i in range(num_downs - 5):
+            unet_block = UnetSkipConnectionBlock(
+                ngf * 8, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer, use_dropout=use_dropout)
+        unet_block = UnetSkipConnectionBlock(
+            ngf * 4, ngf * 8, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(
+            ngf * 2, ngf * 4, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(
+            ngf, ngf * 2, input_nc=None, submodule=unet_block, norm_layer=norm_layer)
+        unet_block = UnetSkipConnectionBlock(
+            output_nc, ngf, input_nc=input_nc, submodule=unet_block, outermost=True, norm_layer=norm_layer)
 
         self.model = unet_block
 
@@ -383,14 +406,14 @@ class UnetGenerator(nn.Module):
 # X -------------------identity---------------------- X
 #   |-- downsampling -- |submodule| -- upsampling --|
 class UnetSkipConnectionBlock(nn.Module):
-    def __init__(self, outer_nc, inner_nc, input_nc, 
+    def __init__(self, outer_nc, inner_nc, input_nc,
                  submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetSkipConnectionBlock, self).__init__()
         self.outermost = outermost
 
         if input_nc is None:
             input_nc = outer_nc
-            
+
         downconv = nn.Conv2d(input_nc, inner_nc, kernel_size=4,
                              stride=2, padding=1)
         downrelu = nn.LeakyReLU(0.2, True)
@@ -399,7 +422,7 @@ class UnetSkipConnectionBlock(nn.Module):
         upnorm = norm_layer(outer_nc, affine=True)
 
         # Different position only has differences in `upconv`
-            # for the outermost, the special is `tanh`
+        # for the outermost, the special is `tanh`
         if outermost:
             upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
                                         kernel_size=4, stride=2,
@@ -412,7 +435,8 @@ class UnetSkipConnectionBlock(nn.Module):
             upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
                                         kernel_size=4, stride=2,
                                         padding=1)
-            down = [downrelu, downconv]  # for the innermost, no submodule, and delete the bn
+            # for the innermost, no submodule, and delete the bn
+            down = [downrelu, downconv]
             up = [uprelu, upconv, upnorm]
             model = down + up
             # else, the normal
@@ -436,12 +460,10 @@ class UnetSkipConnectionBlock(nn.Module):
         else:
             x_latter = self.model(x)
             _, _, h, w = x.size()
-            
+
             if h != x_latter.size(2) or w != x_latter.size(3):
                 x_latter = F.upsample(x_latter, (h, w), mode='bilinear')
             return torch.cat([x_latter, x], 1)  # cat in the C channel
-
-
 
 
 ################################### This is for D ###################################
@@ -482,7 +504,8 @@ class NLayerDiscriminator(nn.Module):
             nn.LeakyReLU(0.2, True)
         ]
 
-        sequence += [nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)]
+        sequence += [nn.Conv2d(ndf * nf_mult, 1,
+                               kernel_size=kw, stride=1, padding=padw)]
 
         if use_sigmoid:
             sequence += [nn.Sigmoid()]
@@ -491,19 +514,20 @@ class NLayerDiscriminator(nn.Module):
 
     def forward(self, input):
         return self.model(input)
+
+
 class PFDiscriminator(nn.Module):
     def __init__(self):
 
        super(PFDiscriminator, self).__init__()
 
-
-       self.model=nn.Sequential(
-           nn.Conv2d(256, 512,kernel_size=4, stride=2,padding=1),
+       self.model = nn.Sequential(
+           nn.Conv2d(256, 512, kernel_size=4, stride=2, padding=1),
            nn.LeakyReLU(0.2, True),
-           nn.Conv2d(512, 512,kernel_size=4, stride=2,padding=1),
+           nn.Conv2d(512, 512, kernel_size=4, stride=2, padding=1),
            nn.InstanceNorm2d(512),
            nn.LeakyReLU(0.2, True),
-           nn.Conv2d(512, 512,kernel_size=4, stride=2,padding=1)
+           nn.Conv2d(512, 512, kernel_size=4, stride=2, padding=1)
 
        )
 

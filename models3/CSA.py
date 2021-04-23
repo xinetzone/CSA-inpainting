@@ -1,104 +1,143 @@
-#-*-coding:utf-8-*-
-
 import torch
 from collections import OrderedDict
 from torch.autograd import Variable
+from torch import nn
 
-import torch.nn.functional as F
+from torch.nn import functional as F
 from .base_model import BaseModel
 from . import networks
 from .vgg16 import Vgg16
 
+class ReliefCNN(nn.Module):
+    def __init__(self, in_units, units):
+        super().__init__()
+        self.h_conv = nn.Conv2d(in_units, units, (1, 3), padding=(0, 1))
+        self.v_conv = nn.Conv2d(units, units,
+                                kernel_size=(3, 1), padding=(1, 0))
+        self.s_conv = nn.Conv2d(units, units,
+                                kernel_size=(3, 3), padding=(1, 1))
+
+    def forward(self, X):
+        x = self.h_conv(X)
+        y = self.v_conv(X)
+        z = torch.exp(x) + torch.exp(y) + self.v_conv(x) + self.h_conv(y)
+        x = self.s_conv(x)
+        return F.relu(x)
+
 
 class CSA(BaseModel):
-    def name(self):
-        return 'CSAModel'
+    def __init__(self, name, is_train, checkpoints_dir, gpu_ids,
+                 lambda_A, gan_weight, cosis,
+                 batch_size, mask_type, ngf, ndf,
+                 which_model_netG, which_model_netP, which_model_netD, which_model_netF,
+                 gan_type, continue_train, which_epoch, lr, beta1,
+                 lr_policy, niter, niter_decay, lr_decay_iters, epoch_count, overlap,
+                 fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type, relief_beta = 0.8):
+        super().__init__(name, is_train, checkpoints_dir, gpu_ids)
+        self.relief_beta = relief_beta # test 时，设置为 1
+        self.lambda_A = lambda_A
+        self.gan_weight = gan_weight
+        self.cosis = cosis
+        self._initialize(batch_size, mask_type, ngf, ndf,
+                         which_model_netG, which_model_netP, which_model_netD, which_model_netF,
+                         gan_type, continue_train, which_epoch, lr, beta1,
+                         lr_policy, niter, niter_decay, lr_decay_iters, epoch_count, overlap,
+                         fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type)
 
-    def initialize(self, opt):
-        BaseModel.initialize(self, opt)
+    def _initialize(self, batch_size, mask_type, ngf, ndf,
+                    which_model_netG, which_model_netP, which_model_netD, which_model_netF,
+                    gan_type, continue_train, which_epoch, lr, beta1,
+                    lr_policy, niter, niter_decay, lr_decay_iters, epoch_count, overlap,
+                    fine_size, init_gain, input_nc, input_nc_g, output_nc, norm, use_dropout, init_type):
         self.device = torch.device('cuda')
-        self.opt = opt
-        self.isTrain = opt.isTrain
-
         self.vgg = Vgg16(requires_grad=False)
         self.vgg = self.vgg.cuda()
-        self.input_A = self.Tensor(opt.batchSize, opt.input_nc,
-                                   opt.fineSize, opt.fineSize)
-        self.input_B = self.Tensor(opt.batchSize, opt.output_nc,
-                                   opt.fineSize, opt.fineSize)
+        self.relief_net = ReliefCNN(3, 3).cuda()
+        self.input_A = self.Tensor(batch_size, input_nc,
+                                   fine_size, fine_size)
+        self.input_B = self.Tensor(batch_size, output_nc,
+                                   fine_size, fine_size)
+        self.batch_size = batch_size
 
         # batchsize should be 1 for mask_global
-        self.mask_global = torch.ByteTensor(1, 1, opt.fineSize, opt.fineSize)
+        self.mask_global = torch.ByteTensor(1, 1, fine_size, fine_size)
 
         self.mask_global.zero_()
-        self.mask_global[:, :, int(self.opt.fineSize/4) + self.opt.overlap: int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap,
-                         int(self.opt.fineSize/4) + self.opt.overlap: int(self.opt.fineSize/2) + int(self.opt.fineSize/4) - self.opt.overlap] = 1
+        self.mask_global[:, :, int(fine_size/4) + overlap: int(fine_size/2) + int(fine_size/4) - overlap,
+                         int(fine_size/4) + overlap: int(fine_size/2) + int(fine_size/4) - overlap] = 1
 
-        self.mask_type = opt.mask_type
+        self.mask_type = mask_type
         self.gMask_opts = {}
 
-        if len(opt.gpu_ids) > 0:
+        if len(self.gpu_ids) > 0:
             self.use_gpu = True
             self.mask_global = self.mask_global.cuda()
 
-        self.netG, self.Cosis_list, self.Cosis_list2, self.CSA_model = networks.define_G(opt.input_nc_g, opt.output_nc, opt.ngf,
-                                                                                         opt.which_model_netG, opt, self.mask_global, opt.norm, opt.use_dropout, opt.init_type, self.gpu_ids, opt.init_gain)
-        self.netP, _, _, _ = networks.define_G(opt.input_nc, opt.output_nc, opt.ngf,
-                                               opt.which_model_netP, opt, self.mask_global, opt.norm, opt.use_dropout, opt.init_type, self.gpu_ids, opt.init_gain)
-        if self.isTrain:
+        self.netG, self.Cosis_list, self.Cosis_list2, self.CSA_model = networks.define_G(input_nc_g, output_nc, ngf,
+                                                                                         which_model_netG, self.mask_global,
+                                                                                         norm, use_dropout, init_type, self.gpu_ids, init_gain)
+        self.netP, _, _, _ = networks.define_G(input_nc, output_nc, ngf,
+                                               which_model_netP, self.mask_global,
+                                               norm, use_dropout, init_type, self.gpu_ids, init_gain)
+        if self.is_train:
             use_sigmoid = False
-            if opt.gan_type == 'vanilla':
+            if gan_type == 'vanilla':
                 use_sigmoid = True  # only vanilla GAN using BCECriterion
 
-            self.netD = networks.define_D(opt.input_nc, opt.ndf,
-                                          opt.which_model_netD,
-                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids, opt.init_gain)
-            self.netF = networks.define_D(opt.input_nc, opt.ndf,
-                                          opt.which_model_netF,
-                                          opt.n_layers_D, opt.norm, use_sigmoid, opt.init_type, self.gpu_ids,
-                                          opt.init_gain)
-        if not self.isTrain or opt.continue_train:
+            self.netD = networks.define_D(input_nc, ndf, which_model_netD,
+                                          norm, use_sigmoid, init_type, self.gpu_ids, init_gain)
+            self.netF = networks.define_D(input_nc, ndf, which_model_netF,
+                                          norm, use_sigmoid, init_type, self.gpu_ids, init_gain)
+        if not self.is_train or continue_train:
             print('Loading pre-trained network!')
-            self.load_network(self.netG, 'G', opt.which_epoch)
-            self.load_network(self.netP, 'P', opt.which_epoch)
-            if self.isTrain:
-                self.load_network(self.netD, 'D', opt.which_epoch)
-                self.load_network(self.netF, 'F', opt.which_epoch)
+            self.load_network(self.netG, 'G', which_epoch)
+            self.load_network(self.netP, 'P', which_epoch)
+            if self.is_train:
+                self.load_network(self.netD, 'D', which_epoch)
+                self.load_network(self.netF, 'F', which_epoch)
 
-        if self.isTrain:
-            self.old_lr = opt.lr
+        if self.is_train:
+            self.old_lr = lr
             # define loss functions
             self.criterionGAN = networks.GANLoss(
-                gan_type=opt.gan_type, tensor=self.Tensor)
+                gan_type=gan_type, tensor=self.Tensor)
             self.criterionL1 = torch.nn.L1Loss()
 
             # initialize optimizers
             self.schedulers = []
             self.optimizers = []
             self.optimizer_G = torch.optim.Adam(self.netG.parameters(),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
+                                                lr=lr, betas=(beta1, 0.999))
             self.optimizer_P = torch.optim.Adam(self.netP.parameters(),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
+                                                lr=lr, betas=(beta1, 0.999))
             self.optimizer_D = torch.optim.Adam(self.netD.parameters(),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
+                                                lr=lr, betas=(beta1, 0.999))
             self.optimizer_F = torch.optim.Adam(self.netF.parameters(),
-                                                lr=opt.lr, betas=(opt.beta1, 0.999))
+                                                lr=lr, betas=(beta1, 0.999))
             self.optimizers.append(self.optimizer_G)
             self.optimizers.append(self.optimizer_P)
             self.optimizers.append(self.optimizer_D)
             self.optimizers.append(self.optimizer_F)
             for optimizer in self.optimizers:
-                self.schedulers.append(networks.get_scheduler(optimizer, opt))
+                self.schedulers.append(networks.get_scheduler(
+                    optimizer, lr_policy, niter, niter_decay, lr_decay_iters, epoch_count))
 
             print('---------- Networks initialized -------------')
             networks.print_network(self.netG)
             networks.print_network(self.netP)
-            if self.isTrain:
+            if self.is_train:
                 networks.print_network(self.netD)
                 networks.print_network(self.netF)
             print('-----------------------------------------------')
 
-    def set_input(self, input, mask):
+    def set_latent_mask(self, mask_global, layer_to_last, threshold):
+        '''It is quite convinient, as one forward-pass, all the innerCos will get the GT_latent!
+        '''
+        self.CSA_model[0].set_mask(mask_global, layer_to_last, threshold)
+        self.Cosis_list[0].set_mask(mask_global, threshold)
+        self.Cosis_list2[0].set_mask(mask_global, threshold)
+
+    def set_input(self, input, mask, mask_type='center', threshold=0.3125):
         input_A = input
         input_B = input.clone()
         input_mask = mask
@@ -107,19 +146,16 @@ class CSA(BaseModel):
 
         self.image_paths = 0
 
-        if self.opt.mask_type == 'center':
+        if mask_type == 'center':
             self.mask_global = self.mask_global
-
-        elif self.opt.mask_type == 'random':
+        elif mask_type == 'random':
             self.mask_global.zero_()
             self.mask_global = input_mask
         else:
-            raise ValueError(
-                "Mask_type [%s] not recognized." % self.opt.mask_type)
-
+            raise ValueError(f"Mask_type [{mask_type}] not recognized.")
+            
         self.ex_mask = self.mask_global.expand(
             1, 3, self.mask_global.size(2), self.mask_global.size(3))  # 1*c*h*w
-
         self.inv_ex_mask = torch.add(torch.neg(self.ex_mask.float()), 1).byte()
         self.input_A.narrow(1, 0, 1).masked_fill_(
             self.mask_global.bool(), 2*123.0/255.0 - 1.0)
@@ -127,18 +163,13 @@ class CSA(BaseModel):
             self.mask_global.bool(), 2*104.0/255.0 - 1.0)
         self.input_A.narrow(1, 2, 1).masked_fill_(
             self.mask_global.bool(), 2*117.0/255.0 - 1.0)
-
-        self.set_latent_mask(self.mask_global, 3, self.opt.threshold)
-
-    # It is quite convinient, as one forward-pass, all the innerCos will get the GT_latent!
-    def set_latent_mask(self, mask_global, layer_to_last, threshold):
-        self.CSA_model[0].set_mask(mask_global, layer_to_last, threshold)
-        self.Cosis_list[0].set_mask(mask_global, self.opt)
-        self.Cosis_list2[0].set_mask(mask_global, self.opt)
+        self.set_latent_mask(self.mask_global, 3, threshold)
 
     def forward(self):
         self.real_A = self.input_A.to(self.device)
-        self.fake_P = self.netP(self.real_A)
+        # 修改
+        self.fake_P = self.relief_beta*self.real_A + (1-self.relief_beta)*self.relief_net(self.real_A)
+        self.fake_P = self.netP(self.fake_P)
         self.un = self.fake_P.clone()
         self.Unknowregion = self.un.data.masked_fill_(
             self.inv_ex_mask.bool(), 0)
@@ -208,14 +239,14 @@ class CSA(BaseModel):
 
         # Second, G(A) = B
         self.loss_G_L1 = (self.criterionL1(self.fake_B, self.real_B) +
-                          self.criterionL1(self.fake_P, self.real_B)) * self.opt.lambda_A
+                          self.criterionL1(self.fake_P, self.real_B)) * self.lambda_A
 
-        self.loss_G = self.loss_G_L1 + self.loss_G_GAN * self.opt.gan_weight
+        self.loss_G = self.loss_G_L1 + self.loss_G_GAN * self.gan_weight
 
         # Third add additional netG contraint loss!
         self.ng_loss_value = 0
         self.ng_loss_value2 = 0
-        if self.opt.cosis:
+        if self.cosis:
             for gl in self.Cosis_list:
                 #self.ng_loss_value += gl.backward()
                 self.ng_loss_value += Variable(gl.loss.data,
@@ -250,18 +281,16 @@ class CSA(BaseModel):
                             ])
 
     def get_current_visuals(self):
-
         real_A = self.real_A.data
         fake_B = self.fake_B.data
         real_B = self.real_B.data
-
         return real_A, real_B, fake_B
 
     def save(self, epoch):
-        self.save_network(self.netG, 'G', epoch, self.gpu_ids)
-        self.save_network(self.netP, 'P', epoch, self.gpu_ids)
-        self.save_network(self.netD, 'D', epoch, self.gpu_ids)
-        self.save_network(self.netF, 'F', epoch, self.gpu_ids)
+        self.save_network(self.netG, 'G', epoch)
+        self.save_network(self.netP, 'P', epoch)
+        self.save_network(self.netD, 'D', epoch)
+        self.save_network(self.netF, 'F', epoch)
 
     def load(self, epoch):
         self.load_network(self.netG, 'G', epoch)

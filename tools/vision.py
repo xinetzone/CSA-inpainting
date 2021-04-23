@@ -11,9 +11,12 @@ class VisionDataset(VisionLoader):
     def __init__(self, loader: dict, split: str = "train",
                  target_type: Union[List[str], str] = "attr",
                  transform: Optional[Callable] = None,
-                 target_transform: Optional[Callable] = None) -> None:
+                 target_transform: Optional[Callable] = None,
+                 pil_transform=False, alpha=1) -> None:
         super().__init__(loader, transform=transform,
                          target_transform=target_transform)
+        self.pil_transform = pil_transform
+        self.alpha = alpha
         if isinstance(target_type, list):
             self.target_type = target_type
         else:
@@ -59,11 +62,36 @@ class VisionDataset(VisionLoader):
                 raise ValueError(
                     "Target type \"{}\" is not recognized.".format(t))
         with self.loader.Z.open(f'img_align_celeba/{self.filename[index]}') as im:
-            X = Image.open(im)
-            if self.transform is not None:
-                X = self.transform(X)
-            else:
-                X = as_tensor(X)
+            with Image.open(im) as X:
+                if self.pil_transform:
+                    depth = 27.    # 预设深度为10，取值范围(0-100)       
+                    grad_x, grad_y, grad_z = np.gradient(X)  # 分别取图像的梯度值
+                    grad_x = grad_x * depth/100.  # 根据深度调整 x，y轴的梯度值
+                    grad_y = grad_y * depth/100.
+                    grad_z = grad_z * depth/100.
+
+                    A = np.sqrt(grad_x**2+grad_y**2+grad_z**2) + 1e-7
+                    uni_x = grad_x/A
+                    uni_y = grad_y/A
+                    uni_z = grad_z/A
+
+                    vec_el = np.pi/7.2  # 光源的俯视角度，弧度值
+                    vec_ez = np.pi/7  # 光源的方位角度，弧度值
+                    dx = np.cos(vec_el)*np.cos(vec_ez)  # 光影对x轴的影响
+                    dy = np.cos(vec_el)*np.sin(vec_ez)  # 光影对y轴的影响
+                    dz = np.sin(vec_el)  # 光影对z轴的影响
+
+                    e = 255*(dx*uni_x + dy*uni_y + dz*uni_z)  # 光源归一化
+                    e = e.clip(0, 255)
+
+                    _X = (1-self.alpha) * e + self.alpha * np.array(X)
+                    X = Image.fromarray(_X.astype('uint8'))  # 重构图像
+                    
+
+                if self.transform is not None:
+                    X = self.transform(X)
+                else:
+                    X = as_tensor(X)
 
         if target:
             target = tuple(target) if len(target) > 1 else target[0]

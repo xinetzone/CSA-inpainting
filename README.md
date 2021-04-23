@@ -64,6 +64,8 @@ cd CSA-inpainting
 * 修改选项类以设置 `data_root`，`mask_root`，`checkpoints_dir`，`mask_type` 和其他参数。
 * 运行 `train.ipynb`
 
+
+
 ## 模型测试
 * 在 Jupyter Notebook 中打开 `test.ipynb`
 * 保持与训练期间相同的参数
